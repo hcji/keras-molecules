@@ -2,45 +2,28 @@ from __future__ import print_function
 
 import argparse
 import os
+os.environ['KERAS_BACKEND'] = 'tensorflow'
 import h5py
 import numpy as np
-
-os.environ['KERAS_BACKEND'] = 'tensorflow'
-NUM_EPOCHS = 1
-BATCH_SIZE = 600
-LATENT_DIM = 292
-RANDOM_SEED = 1337
-
-def get_arguments():
-    parser = argparse.ArgumentParser(description='Molecular autoencoder network')
-    parser.add_argument('data', type=str, help='The HDF5 file containing preprocessed data.')
-    parser.add_argument('model', type=str,
-                        help='Where to save the trained model. If this file exists, it will be opened and resumed.')
-    parser.add_argument('--epochs', type=int, metavar='N', default=NUM_EPOCHS,
-                        help='Number of epochs to run during training.')
-    parser.add_argument('--latent_dim', type=int, metavar='N', default=LATENT_DIM,
-                        help='Dimensionality of the latent representation.')
-    parser.add_argument('--batch_size', type=int, metavar='N', default=BATCH_SIZE,
-                        help='Number of samples to process per minibatch during training.')
-    parser.add_argument('--random_seed', type=int, metavar='N', default=RANDOM_SEED,
-                        help='Seed to use to start randomizer for shuffling.')
-    return parser.parse_args()
-
-np.random.seed(123)#args.random_seed)
-
 from molecules.model import MoleculeVAE
 from molecules.utils import one_hot_array, one_hot_index, from_one_hot_array, \
     decode_smiles_from_indexes, load_dataset
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 
-data_train, data_test, charset = load_dataset('./data/smiles_50k.h5')#args.data)
-model = MoleculeVAE()
-if os.path.isfile(args.model):
-    model.load(charset, args.model, latent_rep_size = args.latent_dim)
-else:
-    model.create(charset, latent_rep_size = args.latent_dim)
+NUM_EPOCHS = 100
+BATCH_SIZE = 10
+LATENT_DIM = 128
+RANDOM_SEED = 123
 
-checkpointer = ModelCheckpoint(filepath = args.model,
+np.random.seed(RANDOM_SEED)#args.random_seed)
+
+
+data_train, data_test, charset = load_dataset('./data/processed.h5')
+model = MoleculeVAE()
+#model.load(charset, args.model, latent_rep_size = args.latent_dim)
+model.create(charset, latent_rep_size=LATENT_DIM)
+
+checkpointer = ModelCheckpoint(filepath = './test_models/weights.{epoch:02d}-{val_loss:.2f}.hdf5',
                                verbose = 1,
                                save_best_only = True)
 
@@ -49,12 +32,13 @@ reduce_lr = ReduceLROnPlateau(monitor = 'val_loss',
                               patience = 3,
                               min_lr = 0.0001)
 
+data_train = data_train[:1]
 model.autoencoder.fit(
     data_train,
     data_train,
     shuffle = True,
-    nb_epoch = args.epochs,
-    batch_size = args.batch_size,
+    nb_epoch = NUM_EPOCHS,
+    batch_size = BATCH_SIZE,
     callbacks = [checkpointer, reduce_lr],
     validation_data = (data_test, data_test)
 )
